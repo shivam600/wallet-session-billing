@@ -36,6 +36,7 @@ Any action that is not an arrow above returns HTTP 400.
 ```mermaid
 erDiagram
     USER ||--|| WALLET : has
+    WALLET ||--o{ WALLET_ENTRY : "ledger"
     USER ||--o{ RECHARGE_TRANSACTION : initiates
     USER ||--o{ CONSULTATION_SESSION : "books (user)"
     USER |o--o{ CONSULTATION_SESSION : "serves (provider)"
@@ -49,6 +50,15 @@ erDiagram
         int id PK
         int user_id FK "unique"
         decimal balance "CHECK >= 0"
+    }
+    WALLET_ENTRY {
+        int id PK
+        int wallet_id FK
+        string entry_type "credit | debit"
+        decimal amount "CHECK > 0"
+        decimal balance_after
+        string reason "recharge | session_billing"
+        string reference "RCH-... or session:id"
     }
     RECHARGE_TRANSACTION {
         int id PK

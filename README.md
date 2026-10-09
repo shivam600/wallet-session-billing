@@ -42,7 +42,7 @@ The minimum balance to start a session is `5 x SESSION_PER_MINUTE_COST`.
 python manage.py test
 ```
 
-36 tests, all passing. They cover the six required scenarios (each is marked
+41 tests, all passing. They cover the six required scenarios (each is marked
 with a `# Required scenario N` comment) plus permissions, rounding and
 edge cases. Time is frozen in tests, so there are no `sleep()` calls.
 
@@ -65,6 +65,7 @@ All endpoints except register, login and the recharge callback need the header
 | POST | `/api/auth/register/` | anyone | `{username, password, role: USER or PROVIDER}`, returns a token |
 | POST | `/api/auth/login/` | anyone | `{username, password}`, returns a token |
 | GET | `/api/wallet/` | any | Current balance |
+| GET | `/api/wallet/entries/` | any | Ledger: every credit and debit, newest first |
 | POST | `/api/wallet/recharge/` | any | `{amount}`, creates a **pending** recharge and returns its `reference` |
 | POST | `/api/wallet/recharge/callback/` | mock gateway | `{reference, status: success or failed}` |
 | POST | `/api/sessions/` | USER | Create a session. Optional `{provider_id}` assigns it right away |
@@ -125,7 +126,7 @@ curl -X POST localhost:8000/api/sessions/1/end/  -H "Authorization: Token $USER_
 ```
 config/          settings, root urls
 accounts/        custom User (role: USER / PROVIDER), registration, role permissions
-wallet/          Wallet, RechargeTransaction, wallet services, recharge API, tests
+wallet/          Wallet, WalletEntry (ledger), RechargeTransaction, wallet services, recharge API, tests
 consultations/   ConsultationSession, state machine + billing (services.py), API, tests,
                  management command bill_active_sessions
 docs/            state diagram and ER diagram

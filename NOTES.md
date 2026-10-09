@@ -20,6 +20,14 @@ are no scattered `if status == ...` checks. I added a `cancelled` state
    concurrent requests can't spend the same balance.
 3. A DB `CheckConstraint` (`balance >= 0`) as a final safety net.
 
+## 3b. Wallet ledger
+Every credit and debit also writes an append-only `WalletEntry` (type, amount,
+`balance_after`, reason, reference) in the same transaction as the balance
+change, so the balance can always be explained and re-computed: credits minus
+debits equals the wallet balance (checked in a test). A partial unique
+constraint allows only one `recharge` entry per recharge reference, a
+second database-level guard for idempotency. Exposed at `GET /api/wallet/entries/`.
+
 ## 4. Idempotent recharge callback
 The callback locks the `RechargeTransaction` row and only credits when the
 status is still `pending`. A repeated `success` callback returns 200 with

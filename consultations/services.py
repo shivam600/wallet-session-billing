@@ -13,6 +13,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from accounts.models import User
+from wallet.models import WalletEntry
 from wallet.services import debit, get_wallet
 
 from .exceptions import ActiveSessionExists, InsufficientBalanceToStart, InvalidTransition
@@ -201,7 +202,7 @@ def _bill_locked(session, now):
 
     charged = session.per_minute_cost * to_charge
     if to_charge:
-        debit(wallet, charged)
+        debit(wallet, charged, WalletEntry.Reason.SESSION_BILLING, f"session:{session.pk}")
         session.billed_minutes += to_charge
         session.billed_amount += charged
 

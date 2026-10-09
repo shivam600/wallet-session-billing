@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from .exceptions import InsufficientBalance, RechargeConflict
-from .models import RechargeTransaction, Wallet
+from .models import RechargeTransaction, Wallet, WalletEntry
 
 
 def get_wallet(user, lock=False):
@@ -22,16 +22,25 @@ def get_wallet(user, lock=False):
     return wallet
 
 
-def credit(wallet, amount):
+def credit(wallet, amount, reason, reference=""):
+    """Add money to a wallet the caller has locked, and record a ledger entry."""
     amount = Decimal(amount)
     if amount <= 0:
         raise ValueError("Credit amount must be positive.")
     wallet.balance += amount
     wallet.save(update_fields=["balance", "updated_at"])
+    WalletEntry.objects.create(
+        wallet=wallet,
+        entry_type=WalletEntry.EntryType.CREDIT,
+        amount=amount,
+        balance_after=wallet.balance,
+        reason=reason,
+        reference=reference,
+    )
 
 
-def debit(wallet, amount):
-    """Deduct from a wallet that the caller has already locked."""
+def debit(wallet, amount, reason, reference=""):
+    """Deduct from a wallet the caller has locked, and record a ledger entry."""
     amount = Decimal(amount)
     if amount <= 0:
         raise ValueError("Debit amount must be positive.")
@@ -39,6 +48,14 @@ def debit(wallet, amount):
         raise InsufficientBalance(f"Balance {wallet.balance} is less than {amount}.")
     wallet.balance -= amount
     wallet.save(update_fields=["balance", "updated_at"])
+    WalletEntry.objects.create(
+        wallet=wallet,
+        entry_type=WalletEntry.EntryType.DEBIT,
+        amount=amount,
+        balance_after=wallet.balance,
+        reason=reason,
+        reference=reference,
+    )
 
 
 def initiate_recharge(user, amount):
@@ -75,6 +92,11 @@ def process_recharge_callback(reference, new_status):
     txn.save(update_fields=["status", "completed_at"])
 
     if new_status == RechargeTransaction.Status.SUCCESS:
-        credit(get_wallet(txn.user, lock=True), txn.amount)
+        credit(
+            get_wallet(txn.user, lock=True),
+            txn.amount,
+            WalletEntry.Reason.RECHARGE,
+            txn.reference,
+        )
         return txn, True
     return txn, False

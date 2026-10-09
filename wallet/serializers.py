@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import RechargeTransaction, Wallet
+from .models import RechargeTransaction, Wallet, WalletEntry
 
 
 class WalletSerializer(serializers.ModelSerializer):
@@ -22,3 +22,9 @@ class RechargeTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = RechargeTransaction
         fields = ("reference", "amount", "status", "created_at", "completed_at")
+
+
+class WalletEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletEntry
+        fields = ("id", "entry_type", "amount", "balance_after", "reason", "reference", "created_at")

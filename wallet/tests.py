@@ -7,7 +7,7 @@ from rest_framework.test import APIClient, APITestCase
 from accounts.models import User
 
 from .exceptions import InsufficientBalance
-from .models import RechargeTransaction, Wallet
+from .models import RechargeTransaction, Wallet, WalletEntry
 from .services import debit, get_wallet
 
 
@@ -93,7 +93,7 @@ class WalletTestCase(APITestCase):
         wallet.save()
         with self.assertRaises(InsufficientBalance):
             with transaction.atomic():
-                debit(get_wallet(self.user, lock=True), Decimal("50"))
+                debit(get_wallet(self.user, lock=True), Decimal("50"), WalletEntry.Reason.SESSION_BILLING)
         self.assertEqual(self.balance(), Decimal("40"))
 
     def test_database_rejects_negative_balance(self):
@@ -102,3 +102,29 @@ class WalletTestCase(APITestCase):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 wallet.save()
+
+    def test_recharge_writes_one_ledger_entry_even_if_callback_repeats(self):
+        reference = self.initiate("500")
+        self.callback(reference)
+        self.callback(reference)
+
+        entries = WalletEntry.objects.filter(wallet__user=self.user)
+        self.assertEqual(entries.count(), 1)
+        entry = entries.get()
+        self.assertEqual(entry.entry_type, "credit")
+        self.assertEqual(entry.reason, "recharge")
+        self.assertEqual(entry.reference, reference)
+        self.assertEqual(entry.amount, Decimal("500"))
+        self.assertEqual(entry.balance_after, Decimal("500"))
+
+    def test_failed_recharge_writes_no_ledger_entry(self):
+        self.callback(self.initiate("500"), "failed")
+        self.assertFalse(WalletEntry.objects.filter(wallet__user=self.user).exists())
+
+    def test_ledger_endpoint_lists_own_entries_newest_first(self):
+        self.callback(self.initiate("100"))
+        self.callback(self.initiate("200"))
+        resp = self.client.get("/api/wallet/entries/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([Decimal(e["amount"]) for e in resp.data], [Decimal("200"), Decimal("100")])
+        self.assertEqual(Decimal(resp.data[0]["balance_after"]), Decimal("300"))

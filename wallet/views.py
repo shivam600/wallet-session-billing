@@ -1,4 +1,4 @@
-from rest_framework import status
+from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,6 +8,7 @@ from .serializers import (
     RechargeCallbackSerializer,
     RechargeInitiateSerializer,
     RechargeTransactionSerializer,
+    WalletEntrySerializer,
     WalletSerializer,
 )
 
@@ -16,6 +17,16 @@ class WalletView(APIView):
     def get(self, request):
         wallet = services.get_wallet(request.user)
         return Response(WalletSerializer(wallet).data)
+
+
+class WalletEntryListView(generics.ListAPIView):
+    """The user's ledger, newest first."""
+
+    serializer_class = WalletEntrySerializer
+
+    def get_queryset(self):
+        wallet = services.get_wallet(self.request.user)
+        return wallet.entries.all()
 
 
 class RechargeInitiateView(APIView):

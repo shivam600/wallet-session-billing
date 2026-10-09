@@ -9,7 +9,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
 
 from accounts.models import User
-from wallet.models import Wallet
+from wallet.models import Wallet, WalletEntry
 
 from .models import ConsultationSession
 
@@ -352,3 +352,39 @@ class PermissionTests(SessionTestBase):
         login = client.post("/api/auth/login/", {"username": "newbie", "password": "secret123"}, format="json")
         self.assertEqual(login.status_code, 200)
         self.assertIn("token", login.data)
+
+
+class LedgerTests(SessionTestBase):
+    def entries(self):
+        return list(WalletEntry.objects.filter(wallet__user=self.user).order_by("id"))
+
+    def test_billing_is_recorded_in_the_ledger_and_matches_the_balance(self):
+        self.recharge(300)
+        session_id = self.started_session()
+
+        self.act(self.user_api, session_id, "bill", minutes=2)
+        self.act(self.user_api, session_id, "bill", minutes=2)  # duplicate run
+        self.act(self.user_api, session_id, "end", minutes=2)
+
+        entries = self.entries()
+        self.assertEqual([e.entry_type for e in entries], ["credit", "debit"])  # no extra rows
+        debit = entries[1]
+        self.assertEqual(debit.amount, Decimal("100"))
+        self.assertEqual(debit.balance_after, Decimal("200"))
+        self.assertEqual(debit.reason, "session_billing")
+        self.assertEqual(debit.reference, f"session:{session_id}")
+
+        credits = sum(e.amount for e in entries if e.entry_type == "credit")
+        debits = sum(e.amount for e in entries if e.entry_type == "debit")
+        self.assertEqual(credits - debits, self.balance())
+
+    def test_nothing_is_written_when_the_wallet_cannot_pay(self):
+        self.recharge(250)
+        session_id = self.started_session()
+
+        self.act(self.user_api, session_id, "bill", minutes=5)
+        self.act(self.user_api, session_id, "bill", minutes=6)  # unaffordable, session ends
+
+        debits = [e for e in self.entries() if e.entry_type == "debit"]
+        self.assertEqual(sum(e.amount for e in debits), Decimal("250"))
+        self.assertEqual(self.entries()[-1].balance_after, Decimal("0"))
