@@ -257,9 +257,9 @@ class InvalidTransitionTests(SessionTestBase):
         session_id = self.create_session()  # assigned, not accepted
         self.assertEqual(self.act(self.user_api, session_id, "start").status_code, 400)
 
-    def test_accepting_an_unassigned_session_returns_400(self):
+    def test_provider_cannot_see_an_unassigned_session(self):
         session_id = self.create_session(assign=False)
-        # no provider is attached yet, so the provider can't even see it...
+        # No provider is attached yet, so the provider gets a 404.
         self.assertEqual(self.provider_api.post(f"/api/sessions/{session_id}/accept/").status_code, 404)
 
     def test_ending_twice_returns_400(self):

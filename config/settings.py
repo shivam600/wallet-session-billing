@@ -1,4 +1,5 @@
 import os
+import sys 
 from decimal import Decimal
 from pathlib import Path
 
@@ -66,7 +67,8 @@ SESSION_PER_MINUTE_COST = Decimal(os.environ.get("SESSION_PER_MINUTE_COST", "50"
 MIN_MINUTES_TO_START = 5
 
 # Password hashing is deliberately slow; use a fast hasher only while running tests.
-import sys  # noqa: E402
+ # noqa: E402
 
+# Use a fast password hasher while running tests.
 if "test" in sys.argv:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
